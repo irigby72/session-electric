@@ -23,12 +23,20 @@
 - Vanilla JS, no frameworks — single-page app
 - Files: `index.html`, `css/styles.css`, `js/midi.js`, `js/keyboard.js`, `js/controls.js`, `js/main.js`
 
-## Current Status — All 5 stages implemented, needs testing
-- **Stage 1 (Scaffold + MIDI):** Done. Web MIDI API with sysex, output selector dropdown, connection status indicator.
-- **Stage 2 (Keyboards):** Done. Two 25-key keyboards — upper C4-C6 (MIDI 60-84), lower C2-C4 (MIDI 36-60). Velocity-sensitive: bottom of key = 127, top = 1. Multi-touch support.
-- **Stage 3 (12 Pattern Buttons):** Done. 4x3 grid, MIDI notes C1-B1 (24-35). Pink buttons (C-G, 24-31) are toggle/exclusive (only one active at a time, highlighted when on). Yellow (G#/A/Bb, 32-34) and green (B, 35) are momentary.
+## Current Status — All 5 stages implemented, tested on iPad
+- **Stage 1 (Scaffold + MIDI):** Done. Web MIDI API with sysex (fallback to non-sysex). Output selector dropdown, connection status indicator. Compatible with Web MIDI Browser's non-standard MIDIOutputMap (forEach-based iteration, string-coerced IDs).
+- **Stage 2 (Keyboards):** Done. Two 25-key keyboards — upper C5-C7 (MIDI 72-96), lower C3-C5 (MIDI 48-72). Velocity-sensitive: bottom of key = 127, top = 1. Multi-touch support.
+- **Stage 3 (12 Pattern Buttons):** Done. 4x3 grid, MIDI notes C2-B2 (36-47). Pink buttons (C-G, 36-43) are toggle/exclusive (only one active at a time, highlighted when on). Yellow (G#/A/Bb, 44-46) and green (B, 47) are momentary.
 - **Stage 4 (Sliders):** Done. Pitch bend (top, springs back to center, 14-bit). Mod wheel (bottom, stays in place, CC#1).
-- **Stage 5 (Transport):** Done. 7 buttons sending MMC SysEx — rewind, forward, stop, play, pause, record (red), loop (CC#117 toggle). Logic needs "Listen to MMC input" enabled in Project Settings > Synchronization.
+- **Stage 5 (Transport):** Done. 7 buttons sending MMC SysEx — rewind, forward, stop, play, pause, record (red), loop (CC#117 toggle). Transport requires sysex permission (works on Mac Chrome, may not work in Web MIDI Browser).
+
+## Web MIDI Browser Compatibility Notes
+- The Web MIDI Browser on iPad uses a non-standard MIDI API implementation
+- `MIDIOutputMap` is not iterable (no `for...of`), use `.forEach()` instead
+- `forEach` callback doesn't provide map keys; use `output.id` property directly
+- `output.id` is a number, must be coerced to string for `<select>` value matching
+- MIDI API is available at DOMContentLoaded (no injection delay observed)
+- Connect via "IDAM MIDI Host" output to reach Logic on Mac
 
 ## Design
 - Sunburst gradient background (gold center → orange/red → dark brown edges) inspired by Electric Sunburst Deluxe
@@ -36,11 +44,17 @@
 - UI sketch reference: `/Users/ianrigby/Desktop/IMG_0754.jpeg`
 - Color reference: `/Users/ianrigby/Desktop/Screenshot 2026-02-01 at 10.28.18 AM.png`
 
-## Next Steps
-- User testing of all stages on iPad (Web MIDI Browser) and Chrome on Mac
-- Deploy to GitHub Pages
-- Potential adjustments based on testing feedback (layout sizing, MIDI mappings, etc.)
+## Deployment
+- Deployed to GitHub Pages via GitHub Actions workflow
+- Repository: `irigby72/session-electric`
+- Auto-deploys on push to `main`
 
-## Development and Testing
-- We will develop the app in stages and will do testing with each stage
-- The stages will include: Basic interface, keyboard design and outputs, 12 buttons design and outputs, pitch bend and mod wheel design and outputs, Logic controls buttons design and outputs
+## Tested and Working
+- All keyboards, pattern buttons, sliders, and transport buttons verified on iPad via Web MIDI Browser
+- MIDI output confirmed reaching Logic Pro via IDAM MIDI Host
+- Chrome on Mac also works for testing (uses standard Web MIDI API)
+- Chrome on iPad does NOT work (iOS WebKit has no Web MIDI support)
+
+## Potential Future Enhancements
+- Layout sizing adjustments based on continued use
+- Additional MIDI mapping tweaks if needed for different instruments
