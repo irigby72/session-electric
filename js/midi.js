@@ -2,6 +2,8 @@ const MIDI = {
   output: null,
   access: null,
 
+  sysexEnabled: false,
+
   async init() {
     if (!navigator.requestMIDIAccess) {
       console.error('Web MIDI API not supported');
@@ -9,13 +11,19 @@ const MIDI = {
     }
     try {
       this.access = await navigator.requestMIDIAccess({ sysex: true });
-      this.access.onstatechange = () => this.populateOutputs();
-      this.populateOutputs();
-      return true;
+      this.sysexEnabled = true;
     } catch (err) {
-      console.error('MIDI access denied:', err);
-      return false;
+      console.warn('SysEx not available, falling back without it:', err);
+      try {
+        this.access = await navigator.requestMIDIAccess({ sysex: false });
+      } catch (err2) {
+        console.error('MIDI access denied:', err2);
+        return false;
+      }
     }
+    this.access.onstatechange = () => this.populateOutputs();
+    this.populateOutputs();
+    return true;
   },
 
   populateOutputs() {
@@ -46,7 +54,7 @@ const MIDI = {
     const status = document.getElementById('connection-status');
     if (id && this.access.outputs.has(id)) {
       this.output = this.access.outputs.get(id);
-      status.textContent = 'Connected';
+      status.textContent = this.sysexEnabled ? 'Connected' : 'Connected (no SysEx)';
       status.className = 'connected';
     } else {
       this.output = null;
@@ -81,6 +89,7 @@ const MIDI = {
   },
 
   sysex(data) {
+    if (!this.sysexEnabled) return;
     this.send(data);
   }
 };
