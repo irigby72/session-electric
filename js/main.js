@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
   // Always build UI first — never let MIDI block rendering
   PatternButtons.init();
   Sliders.init();
@@ -13,13 +13,13 @@ document.addEventListener('DOMContentLoaded', () => {
   connectMIDI();
 });
 
-// Temporary debug log visible on iPad (no console access)
+// Temporary debug log visible on iPad
 function debugLog(msg) {
-  let el = document.getElementById('debug-log');
+  var el = document.getElementById('debug-log');
   if (!el) {
     el = document.createElement('div');
     el.id = 'debug-log';
-    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font:12px monospace;padding:8px;max-height:30vh;overflow-y:auto;z-index:9999;';
+    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font:12px monospace;padding:8px;max-height:30vh;overflow-y:auto;z-index:9999;white-space:pre-wrap;';
     document.body.appendChild(el);
   }
   el.textContent += msg + '\n';
@@ -27,60 +27,33 @@ function debugLog(msg) {
 }
 
 async function connectMIDI() {
-  const status = document.getElementById('connection-status');
+  var status = document.getElementById('connection-status');
 
   debugLog('requestMIDIAccess exists: ' + !!navigator.requestMIDIAccess);
-  debugLog('typeof: ' + typeof navigator.requestMIDIAccess);
 
-  // Web MIDI Browser may inject MIDI API slightly after page load — retry if needed
-  let attempts = 0;
+  // Web MIDI Browser may inject MIDI API slightly after page load
+  var attempts = 0;
   while (!navigator.requestMIDIAccess && attempts < 10) {
     attempts++;
     status.textContent = 'Waiting for MIDI... (' + attempts + ')';
-    debugLog('Waiting attempt ' + attempts + '...');
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(function(r) { setTimeout(r, 500); });
   }
 
   if (!navigator.requestMIDIAccess) {
-    debugLog('MIDI API never appeared after ' + attempts + ' attempts');
+    debugLog('MIDI API never appeared');
     status.textContent = 'MIDI not available';
     return;
   }
 
-  debugLog('Trying requestMIDIAccess({sysex:true})...');
-  try {
-    const access = await navigator.requestMIDIAccess({ sysex: true });
-    debugLog('sysex:true SUCCESS');
-    debugLog('outputs.size: ' + access.outputs.size);
-    for (const [id, out] of access.outputs) {
-      debugLog('  output: id=' + id + ' name=' + out.name + ' state=' + out.state);
-    }
-    MIDI.access = access;
-    MIDI.sysexEnabled = true;
-    access.onstatechange = () => MIDI.populateOutputs();
-    MIDI.populateOutputs();
-    return;
-  } catch (err) {
-    debugLog('sysex:true FAILED: ' + err.message);
+  var ok = await MIDI.init();
+  debugLog('MIDI.init() returned: ' + ok);
+  debugLog('sysexEnabled: ' + MIDI.sysexEnabled);
+  debugLog('_outputs count: ' + MIDI._outputs.length);
+  for (var i = 0; i < MIDI._outputs.length; i++) {
+    debugLog('  output: id=' + MIDI._outputs[i].id + ' name=' + MIDI._outputs[i].output.name);
   }
 
-  debugLog('Trying requestMIDIAccess({sysex:false})...');
-  try {
-    const access = await navigator.requestMIDIAccess({ sysex: false });
-    debugLog('sysex:false SUCCESS');
-    debugLog('outputs.size: ' + access.outputs.size);
-    for (const [id, out] of access.outputs) {
-      debugLog('  output: id=' + id + ' name=' + out.name + ' state=' + out.state);
-    }
-    MIDI.access = access;
-    MIDI.sysexEnabled = false;
-    access.onstatechange = () => MIDI.populateOutputs();
-    MIDI.populateOutputs();
-    return;
-  } catch (err2) {
-    debugLog('sysex:false FAILED: ' + err2.message);
+  if (!ok) {
+    status.textContent = 'MIDI not available';
   }
-
-  debugLog('All MIDI attempts failed');
-  status.textContent = 'MIDI not available';
 }

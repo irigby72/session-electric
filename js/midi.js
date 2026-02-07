@@ -2,6 +2,8 @@ const MIDI = {
   output: null,
   access: null,
   sysexEnabled: false,
+  // Cache outputs as a plain array for cross-browser compatibility
+  _outputs: [],
 
   async init() {
     if (!navigator.requestMIDIAccess) {
@@ -11,13 +13,12 @@ const MIDI = {
 
     // Try with sysex first (Web MIDI Browser prefers this)
     try {
-      this.access = await this.requestWithTimeout({ sysex: true }, 3000);
+      this.access = await navigator.requestMIDIAccess({ sysex: true });
       this.sysexEnabled = true;
     } catch (err) {
       console.warn('SysEx request failed, trying without:', err);
-      // Fallback to non-sysex
       try {
-        this.access = await this.requestWithTimeout({ sysex: false }, 3000);
+        this.access = await navigator.requestMIDIAccess({ sysex: false });
       } catch (err2) {
         console.error('MIDI access denied:', err2);
         return false;
@@ -28,32 +29,56 @@ const MIDI = {
     return true;
   },
 
-  requestWithTimeout(options, ms) {
-    return Promise.race([
-      navigator.requestMIDIAccess(options),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('MIDI request timed out')), ms)
-      )
-    ]);
+  // Extract outputs into a plain array, handling non-standard MIDIOutputMap
+  getOutputs() {
+    var outputs = this.access.outputs;
+    var result = [];
+
+    // Standard Map: has forEach
+    if (typeof outputs.forEach === 'function') {
+      outputs.forEach(function(output, id) {
+        result.push({ id: id, output: output });
+      });
+      return result;
+    }
+
+    // Plain object fallback
+    var keys = Object.keys(outputs);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var val = outputs[key];
+      // Skip non-MIDIOutput properties like 'size'
+      if (val && typeof val === 'object' && val.name) {
+        result.push({ id: key, output: val });
+      }
+    }
+    return result;
   },
 
   populateOutputs() {
-    const select = document.getElementById('midi-output-select');
-    const currentValue = select.value;
+    var select = document.getElementById('midi-output-select');
+    var currentValue = select.value;
     // Keep the placeholder option
     select.length = 1;
 
-    for (const output of this.access.outputs.values()) {
-      const opt = document.createElement('option');
-      opt.value = output.id;
-      opt.textContent = output.name;
+    this._outputs = this.getOutputs();
+
+    for (var i = 0; i < this._outputs.length; i++) {
+      var item = this._outputs[i];
+      var opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = item.output.name;
       select.appendChild(opt);
     }
 
     // Restore selection or auto-select first
-    if (currentValue && [...this.access.outputs.keys()].includes(currentValue)) {
+    var found = false;
+    for (var j = 0; j < this._outputs.length; j++) {
+      if (this._outputs[j].id === currentValue) { found = true; break; }
+    }
+    if (found) {
       select.value = currentValue;
-    } else if (this.access.outputs.size === 1) {
+    } else if (this._outputs.length === 1) {
       select.selectedIndex = 1;
     }
     this.selectOutput(select.value);
@@ -62,13 +87,22 @@ const MIDI = {
   },
 
   selectOutput(id) {
-    const status = document.getElementById('connection-status');
-    if (id && this.access.outputs.has(id)) {
-      this.output = this.access.outputs.get(id);
+    var status = document.getElementById('connection-status');
+    this.output = null;
+
+    if (id) {
+      for (var i = 0; i < this._outputs.length; i++) {
+        if (this._outputs[i].id === id) {
+          this.output = this._outputs[i].output;
+          break;
+        }
+      }
+    }
+
+    if (this.output) {
       status.textContent = this.sysexEnabled ? 'Connected' : 'Connected (no SysEx)';
       status.className = 'connected';
     } else {
-      this.output = null;
       status.textContent = 'Disconnected';
       status.className = '';
     }
@@ -80,22 +114,27 @@ const MIDI = {
     }
   },
 
-  noteOn(note, velocity = 100, channel = 0) {
+  noteOn(note, velocity, channel) {
+    velocity = velocity || 100;
+    channel = channel || 0;
     this.send([0x90 | channel, note, velocity]);
   },
 
-  noteOff(note, channel = 0) {
+  noteOff(note, channel) {
+    channel = channel || 0;
     this.send([0x80 | channel, note, 0]);
   },
 
-  cc(controller, value, channel = 0) {
+  cc(controller, value, channel) {
+    channel = channel || 0;
     this.send([0xB0 | channel, controller, value]);
   },
 
-  pitchBend(value, channel = 0) {
+  pitchBend(value, channel) {
+    channel = channel || 0;
     // value: 0-16383, center = 8192
-    const lsb = value & 0x7F;
-    const msb = (value >> 7) & 0x7F;
+    var lsb = value & 0x7F;
+    var msb = (value >> 7) & 0x7F;
     this.send([0xE0 | channel, lsb, msb]);
   },
 
