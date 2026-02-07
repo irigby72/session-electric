@@ -39,7 +39,7 @@ const MIDI = {
       var idx = 0;
       outputs.forEach(function(output, id) {
         // Use output's own .id, then map key, then index as fallback
-        var resolvedId = output.id || id || ('output-' + idx);
+        var resolvedId = String(output.id || id || ('output-' + idx));
         result.push({ id: resolvedId, output: output });
         idx++;
       });
@@ -53,7 +53,7 @@ const MIDI = {
       var val = outputs[key];
       // Skip non-MIDIOutput properties like 'size'
       if (val && typeof val === 'object' && val.name) {
-        var valId = val.id || key;
+        var valId = String(val.id || key);
         result.push({ id: valId, output: val });
       }
     }
