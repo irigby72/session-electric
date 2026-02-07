@@ -36,8 +36,12 @@ const MIDI = {
 
     // Standard Map: has forEach
     if (typeof outputs.forEach === 'function') {
+      var idx = 0;
       outputs.forEach(function(output, id) {
-        result.push({ id: id, output: output });
+        // Use output's own .id, then map key, then index as fallback
+        var resolvedId = output.id || id || ('output-' + idx);
+        result.push({ id: resolvedId, output: output });
+        idx++;
       });
       return result;
     }
@@ -49,7 +53,8 @@ const MIDI = {
       var val = outputs[key];
       // Skip non-MIDIOutput properties like 'size'
       if (val && typeof val === 'object' && val.name) {
-        result.push({ id: key, output: val });
+        var valId = val.id || key;
+        result.push({ id: valId, output: val });
       }
     }
     return result;
