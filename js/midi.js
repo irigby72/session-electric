@@ -1,7 +1,6 @@
 const MIDI = {
   output: null,
   access: null,
-
   sysexEnabled: false,
 
   async init() {
@@ -9,13 +8,16 @@ const MIDI = {
       console.error('Web MIDI API not supported');
       return false;
     }
+
+    // Try with sysex first (Web MIDI Browser prefers this)
     try {
-      this.access = await navigator.requestMIDIAccess({ sysex: true });
+      this.access = await this.requestWithTimeout({ sysex: true }, 3000);
       this.sysexEnabled = true;
     } catch (err) {
-      console.warn('SysEx not available, falling back without it:', err);
+      console.warn('SysEx request failed, trying without:', err);
+      // Fallback to non-sysex
       try {
-        this.access = await navigator.requestMIDIAccess({ sysex: false });
+        this.access = await this.requestWithTimeout({ sysex: false }, 3000);
       } catch (err2) {
         console.error('MIDI access denied:', err2);
         return false;
@@ -24,6 +26,15 @@ const MIDI = {
     this.access.onstatechange = () => this.populateOutputs();
     this.populateOutputs();
     return true;
+  },
+
+  requestWithTimeout(options, ms) {
+    return Promise.race([
+      navigator.requestMIDIAccess(options),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('MIDI request timed out')), ms)
+      )
+    ]);
   },
 
   populateOutputs() {
